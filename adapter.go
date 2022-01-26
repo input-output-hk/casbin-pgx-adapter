@@ -8,6 +8,7 @@ import (
 
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -33,6 +34,13 @@ type Adapter struct {
 type Filter struct {
 	P [][]string
 	G [][]string
+}
+
+type Conn interface {
+	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	Close(context.Context) error
+	Config() *pgx.ConnConfig
 }
 
 type Option func(a *Adapter)
@@ -421,10 +429,12 @@ func (a *Adapter) createTable() error {
 }
 
 func createDatabase(dbname string, arg interface{}) (*pgxpool.Pool, error) {
-	var conn *pgx.Conn
+	var conn Conn
 	var err error
 	ctx := context.Background()
 	switch v := arg.(type) {
+	case Conn:
+		conn = v
 	case string:
 		conn, err = pgx.Connect(ctx, v)
 		if err != nil {
